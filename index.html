@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Strategy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { inter: ['Inter', 'sans-serif'] },
+          colors: {
+            gray: {
+              950: '#0a0f1a',
+              900: '#111827',
+              800: '#1f2937',
+              700: '#374151',
+              600: '#4b5563',
+              500: '#6b7280',
+              400: '#9ca3af',
+              300: '#d1d5db',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: #0a0f1a; color: #f9fafb; }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .card-hover {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+    }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0a0f1a; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    .nav-underline {
+      position: relative;
+    }
+    .nav-underline::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: #10b981;
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+    .nav-underline:hover::after { width: 100%; }
+    .row-hover:hover { background: rgba(16,185,129,0.04); }
+    .gallery-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .gallery-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    .gallery-card img { transition: transform 0.4s ease; }
+    .gallery-card:hover img { transform: scale(1.06); }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+    .tag-long  { background: rgba(16,185,129,0.12); color: #34d399; }
+    .tag-short { background: rgba(239,68,68,0.12);  color: #f87171; }
+    .tag-win   { background: rgba(16,185,129,0.12); color: #34d399; }
+    .tag-loss  { background: rgba(239,68,68,0.12);  color: #f87171; }
+    table td, table th { white-space: nowrap; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    #bm-dot { animation: pulse 1.8s infinite; }
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    @media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .trade-example-grid { grid-template-columns: 1fr !important; } }
+    @media (max-width: 900px) { .trade-example-grid > div:last-child { border-left: none !important; border-top: 1px solid rgba(255,255,255,0.06); } }
+    .section-divider { border-color: rgba(255,255,255,0.06); }
+    .input-field {
+      width: 100%;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      color: #f9fafb;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus { border-color: #10b981; }
+    .input-field::placeholder { color: #4b5563; }
+    select.input-field option { background: #1f2937; }
+  </style>
+</head>
+<body>
+
+<!-- ===================== NAVIGATION ===================== -->
+<nav id="navbar" style="position:fixed;top:0;width:100%;z-index:50;background:rgba(10,15,26,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1280px;margin:0 auto;padding:0 1.5rem;height:64px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;background:#10b981;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+        <i class="fas fa-chart-line" style="color:#fff;font-size:15px;"></i>
+      </div>
+      <span style="font-weight:700;font-size:1.1rem;letter-spacing:-0.02em;">TradeFolio</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:2rem;" class="hidden md:flex">
+      <a href="#home"        class="nav-underline" style="color:#9ca3af;font-size:0.875rem;font-weight:500;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9ca3af'">Home</a>
+      <a href="#about"       class="nav-underline" style="color:#9ca3af;font-size:0.875rem;font-weight:500;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9ca3af'">About</a>
+      <a href="#strategy"   class="nav-underline" style="color:#9ca3af;font-size:0.875rem;font-weight:500;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9ca3af'">Strategy</a>
+      <a href="#performance" class="nav-underline" style="color:#9ca3af;font-size:0.875rem;font-weight:500;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9ca3af'">Performance</a>
+      <a href="#dashboard"  class="nav-underline" style="color:#9ca3af;font-size:0.875rem;font-weight:500;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9ca3af'">Dashboard</a>
+      <a href="#simulator"  class="nav-underline" style="color:#f97316;font-size:0.875rem;font-weight:600;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#fb923c'" onmouseout="this.style.color='#f97316'">Live Demo</a>
+    </div>
+    <a href="#dashboard" style="background:#3b82f6;color:#fff;font-size:0.875rem;font-weight:600;padding:0.5rem 1.25rem;border-radius:10px;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+      Footprint Demo
+    </a>
+  </div>
+</nav>
+
+<!-- ===================== HERO ===================== -->
+<section id="home" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:6rem 1.5rem 4rem;">
+  <div style="max-width:1280px;margin:0 auto;width:100%;text-align:center;">
+
+    <!-- Badge -->
+    <div style="margin-bottom:1.75rem;">
+      <span style="display:inline-block;border:1.5px solid #22d3ee;color:#22d3ee;font-size:0.72rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;padding:0.45rem 1.1rem;border-radius:999px;box-shadow:0 0 18px rgba(34,211,238,0.25);">Institutional Order Flow Trading</span>
+    </div>
+
+    <!-- Main Title -->
+    <h1 style="font-size:clamp(4.5rem,12vw,9rem);font-weight:900;line-height:1.0;margin-bottom:0.75rem;letter-spacing:-0.04em;color:#fff;text-shadow:0 0 80px rgba(255,255,255,0.2);">
+      Trading Lab
+    </h1>
+    <p style="font-size:clamp(1.3rem,3.5vw,2.2rem);font-weight:600;color:#22d3ee;text-shadow:0 0 40px rgba(34,211,238,0.45);margin-bottom:1.75rem;letter-spacing:0.01em;">
+      Order Flow Trader &amp; Educator
+    </p>
+
+    <p style="color:#6b7280;font-size:1.1rem;max-width:700px;line-height:1.8;margin-bottom:3rem;margin-left:auto;margin-right:auto;">
+      Self-taught futures trader specialising in Order Flow analysis, using Bookmap and Footprint charts to detect absorption, delta divergence, and institutional liquidity before they move price.
+    </p>
+
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+      <a href="#performance" style="background:#10b981;color:#fff;font-weight:600;padding:0.85rem 1.75rem;border-radius:0.75rem;text-decoration:none;display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;transition:background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+        View Performance <i class="fas fa-arrow-down" style="font-size:0.75rem;"></i>
+      </a>
+      <a href="#strategy" style="border:1px solid #374151;color:#d1d5db;font-weight:600;padding:0.85rem 1.75rem;border-radius:0.75rem;text-decoration:none;font-size:0.9rem;transition:all 0.2s;" onmouseover="this.style.borderColor='#6b7280';this.style.color='#fff'" onmouseout="this.style.borderColor='#374151';this.style.color='#d1d5db'">
+        Read Strategy
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ABOUT ===================== -->
+<section id="about" style="padding:6rem 1.5rem;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg,#0a0f1a 0%,#0d1520 100%);">
+  <div style="max-width:860px;margin:0 auto;text-align:center;">
+
+    <!-- Avatar -->
+    <div style="margin-bottom:1.5rem;display:flex;justify-content:center;">
+      <div id="about-avatar" style="width:160px;height:160px;border-radius:50%;border:3px solid rgba(255,255,255,0.12);overflow:hidden;">
+        <img src="IMG_0640.jpg" alt="Eric Tsai" style="width:100%;height:100%;object-fit:cover;object-position:center top;" />
+      </div>
+    </div>
+
+    <!-- Title -->
+    <h2 style="font-size:2.25rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:0.6rem;">About Me — Eric Tsai</h2>
+    <p style="color:#6b7280;font-size:0.9rem;margin-bottom:1.75rem;">17-year-old Order Flow trader &nbsp;|&nbsp; Focused on intraday microstructure analysis</p>
+    <a href="https://www.tradingview.com/u/YUHUNGTsai/#published-scripts" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.55rem;background:rgba(6,182,212,0.1);border:1.5px solid rgba(6,182,212,0.4);color:#22d3ee;font-size:0.85rem;font-weight:700;padding:0.6rem 1.4rem;border-radius:999px;text-decoration:none;letter-spacing:0.04em;transition:background 0.2s,box-shadow 0.2s;margin-bottom:3rem;" onmouseover="this.style.background='rgba(6,182,212,0.2)';this.style.boxShadow='0 0 20px rgba(34,211,238,0.3)'" onmouseout="this.style.background='rgba(6,182,212,0.1)';this.style.boxShadow='none'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 2h16a2 2 0 012 2v14a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v14h16V4H4zm2 10l3-4 2.5 3 3-4L18 14H6z"/></svg>
+      View TradingView Profile
+    </a>
+
+    <!-- Learning Timeline -->
+    <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;text-align:left;">
+      <h3 style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:1.5rem;">Learning Timeline</h3>
+      <div style="display:flex;flex-direction:column;gap:0;">
+
+        <div style="display:flex;gap:1.25rem;padding-bottom:1.5rem;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#10b981;margin-top:3px;"></div>
+            <div style="width:1px;flex:1;background:rgba(255,255,255,0.08);margin-top:4px;"></div>
+          </div>
+          <div>
+            <p style="color:#10b981;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;">2023</p>
+            <p style="color:#d1d5db;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;">Started Learning — Paper Trading</p>
+            <p style="color:#6b7280;font-size:0.78rem;line-height:1.6;">Studied a wide range of markets through paper trading — options, futures, forex, crypto, US stocks, and Taiwan stocks. Building foundational market knowledge.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.65rem;">
+              <span style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Options</span>
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.4);color:#22d3ee;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Futures</span>
+              <span style="background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.4);color:#34d399;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Forex</span>
+              <span style="background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.4);color:#fb923c;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Crypto</span>
+              <span style="background:rgba(129,140,248,0.12);border:1px solid rgba(129,140,248,0.4);color:#818cf8;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">US Stocks</span>
+              <span style="background:rgba(244,114,182,0.12);border:1px solid rgba(244,114,182,0.4);color:#f472b6;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Taiwan Stocks</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:1.25rem;padding-bottom:1.5rem;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-top:3px;"></div>
+            <div style="width:1px;flex:1;background:rgba(255,255,255,0.08);margin-top:4px;"></div>
+          </div>
+          <div>
+            <p style="color:#3b82f6;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;">2024</p>
+            <p style="color:#d1d5db;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;">Discovered Order Flow &amp; Bookmap</p>
+            <p style="color:#6b7280;font-size:0.78rem;line-height:1.6;">Started learning Bookmap, Footprint charts, and volume delta. Built and backtested the Absorption Reversal System. Began trading live on MES futures, S&amp;P 500, and XAU (Gold).</p>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:1.25rem;padding-bottom:1.5rem;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#a78bfa;margin-top:3px;"></div>
+            <div style="width:1px;flex:1;background:rgba(255,255,255,0.08);margin-top:4px;"></div>
+          </div>
+          <div>
+            <p style="color:#a78bfa;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;">2025</p>
+            <p style="color:#d1d5db;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;">Prop Firm, Competitions &amp; Certifications</p>
+            <p style="color:#6b7280;font-size:0.78rem;line-height:1.6;">Passed Seacrest Funded prop firm evaluation, managing a $10,000 USD live account. Managed a personal trading pool of NT$300,000. Placed <strong style="color:#d1d5db;">24th nationally out of 5,000+ participants</strong> (Top 0.5%) and ranked <strong style="color:#d1d5db;">1st in school</strong> at the UCH National Investment Competition. Earned Bloomberg Market Concepts (BMC) certification.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.65rem;">
+              <span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);color:#a78bfa;font-size:0.65rem;font-weight:600;padding:0.15rem 0.55rem;border-radius:999px;">Seacrest Funded ✓</span>
+              <span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);color:#a78bfa;font-size:0.65rem;font-weight:600;padding:0.15rem 0.55rem;border-radius:999px;">NT$300,000 Managed</span>
+              <span style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">UCH #24 Nationally / #1 in School</span>
+              <span style="background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.4);color:#34d399;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Bloomberg BMC ✓</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:1.25rem;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#f97316;margin-top:3px;box-shadow:0 0 8px rgba(249,115,22,0.6);"></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.25rem;">
+              <p style="color:#f97316;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">2026</p>
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.35);color:#fb923c;font-size:0.6rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.06em;">Now</span>
+            </div>
+            <p style="color:#d1d5db;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;">Community, Teaching &amp; Industry Experience</p>
+            <p style="color:#6b7280;font-size:0.78rem;line-height:1.6;">Founded a school trading club with 15 members, teaching Order Flow and market microstructure analysis to <strong style="color:#d1d5db;">20+ students</strong> in total. Published Pine Script indicators on TradingView with <strong style="color:#d1d5db;">10,000+ views</strong> from the global trading community. Gained investment banking experience at <strong style="color:#d1d5db;">Fubon Bank (Fubon Financial Holding)</strong>, supporting portfolio allocation and institutional risk management.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.65rem;">
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.35);color:#fb923c;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">School Trading Club Founder</span>
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.35);color:#fb923c;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">TradingView 10K+ Views</span>
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.35);color:#fb923c;font-size:0.65rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;">Fubon Bank IB</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== STRATEGY ===================== -->
+<section id="strategy" style="padding:6rem 1.5rem;border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1280px;margin:0 auto;">
+
+    <div style="margin-bottom:3rem;">
+      <p style="color:#10b981;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:0.75rem;">How I Trade</p>
+      <h2 style="font-size:2.5rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:1rem;">Trading Strategy</h2>
+      <p style="color:#6b7280;max-width:640px;line-height:1.75;">
+        Order flow scalping on US index futures. I read the live auction using <strong style="color:#d1d5db;">Bookmap</strong> and <strong style="color:#d1d5db;">Footprint charts</strong> to detect when large passive participants are absorbing aggressive flow — then trade the reaction.
+      </p>
+    </div>
+
+    <!-- Tool Pills -->
+    <div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:2.5rem;">
+      <span style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);color:#10b981;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">Bookmap</span>
+      <span style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#60a5fa;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">Footprint Charts</span>
+      <span style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);color:#a78bfa;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">Volume Profile</span>
+      <span style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.25);color:#fb923c;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">Order Flow</span>
+      <span style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#9ca3af;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">ES / NQ / MES Futures</span>
+      <span style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#9ca3af;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:999px;">Scalping</span>
+    </div>
+
+    <!-- Strategy Layout -->
+    <div style="display:flex;flex-direction:column;gap:1.25rem;margin-bottom:2rem;">
+
+      <!-- Core Philosophy -->
+      <div style="background:#111827;border:1px solid rgba(6,182,212,0.3);border-radius:1.25rem;padding:1.75rem;">
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+          <div style="width:44px;height:44px;background:rgba(6,182,212,0.12);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fas fa-crosshairs" style="color:#22d3ee;font-size:1.1rem;"></i>
+          </div>
+          <h3 style="font-size:1.2rem;font-weight:800;color:#fff;">Core Philosophy</h3>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:6px;height:6px;border-radius:50%;background:#22d3ee;flex-shrink:0;"></div><span style="color:#d1d5db;font-size:0.85rem;">Use Order Flow to find high win-rate entries</span></div>
+          <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:6px;height:6px;border-radius:50%;background:#22d3ee;flex-shrink:0;"></div><span style="color:#d1d5db;font-size:0.85rem;">Fast in, fast out — no overnight holds</span></div>
+          <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:6px;height:6px;border-radius:50%;background:#22d3ee;flex-shrink:0;"></div><span style="color:#d1d5db;font-size:0.85rem;">Execute with discipline, never with emotion</span></div>
+        </div>
+      </div>
+
+      <!-- Entry Conditions -->
+      <div>
+        <p style="color:#fff;font-size:1rem;font-weight:700;margin-bottom:0.85rem;">Entry Conditions — All 3 Must Align</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.85rem;">
+
+          <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;padding:1.25rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem;">
+              <div style="width:28px;height:28px;background:rgba(59,130,246,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#60a5fa;font-size:0.75rem;font-weight:800;">1</span></div>
+              <p style="color:#fff;font-size:0.9rem;font-weight:700;">News Bias</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#10b981;font-size:0.75rem;">▲</span><span style="color:#6b7280;font-size:0.78rem;">Bullish news → look for long setups</span></div>
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#ef4444;font-size:0.75rem;">▼</span><span style="color:#6b7280;font-size:0.78rem;">Bearish news → look for short setups</span></div>
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#6b7280;font-size:0.75rem;">◆</span><span style="color:#6b7280;font-size:0.78rem;">Neutral → both directions valid</span></div>
+            </div>
+          </div>
+
+          <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;padding:1.25rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem;">
+              <div style="width:28px;height:28px;background:rgba(168,85,247,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#a78bfa;font-size:0.75rem;font-weight:800;">2</span></div>
+              <p style="color:#fff;font-size:0.9rem;font-weight:700;">CVD Divergence</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#ef4444;font-size:0.75rem;margin-top:2px;">↓</span><span style="color:#6b7280;font-size:0.78rem;">Price above trendline + CVD flattening/falling → short</span></div>
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#10b981;font-size:0.75rem;margin-top:2px;">↑</span><span style="color:#6b7280;font-size:0.78rem;">Price below trendline + CVD recovering → long</span></div>
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#a78bfa;font-size:0.75rem;margin-top:2px;">★</span><span style="color:#6b7280;font-size:0.78rem;">Stronger divergence = higher win rate</span></div>
+            </div>
+          </div>
+
+          <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;padding:1.25rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem;">
+              <div style="width:28px;height:28px;background:rgba(16,185,129,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#10b981;font-size:0.75rem;font-weight:800;">3</span></div>
+              <p style="color:#fff;font-size:0.9rem;font-weight:700;">Absorption Confirmation</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#10b981;font-size:0.75rem;margin-top:2px;">●</span><span style="color:#6b7280;font-size:0.78rem;">Large green volume = buy absorption → long</span></div>
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#a78bfa;font-size:0.75rem;margin-top:2px;">●</span><span style="color:#6b7280;font-size:0.78rem;">Large purple volume = sell absorption → short</span></div>
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;"><span style="color:#fbbf24;font-size:0.75rem;margin-top:2px;">★</span><span style="color:#6b7280;font-size:0.78rem;">Larger volume = more reliable signal</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Bonus + Entry Execution row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;">
+
+        <!-- Bonus Conditions -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+            <i class="fas fa-plus-circle" style="color:#fbbf24;font-size:0.9rem;"></i>
+            <p style="color:#fff;font-size:0.95rem;font-weight:700;">Bonus Conditions (optional, but better)</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;"><div style="width:5px;height:5px;border-radius:50%;background:#fbbf24;flex-shrink:0;"></div><span style="color:#9ca3af;font-size:0.8rem;">Option Chain Max Pain support/resistance</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><div style="width:5px;height:5px;border-radius:50%;background:#fbbf24;flex-shrink:0;"></div><span style="color:#9ca3af;font-size:0.8rem;">Call Wall / Put Wall key levels</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><div style="width:5px;height:5px;border-radius:50%;background:#fbbf24;flex-shrink:0;"></div><span style="color:#9ca3af;font-size:0.8rem;">Round numbers (7,400 / 7,450 / 7,500)</span></div>
+          </div>
+        </div>
+
+        <!-- Entry Execution -->
+        <div style="background:#0f1c2e;border:1px solid rgba(6,182,212,0.15);border-radius:1.25rem;padding:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+            <i class="fas fa-arrow-trend-up" style="color:#22d3ee;font-size:0.9rem;"></i>
+            <p style="color:#fff;font-size:0.95rem;font-weight:700;">Entry Execution</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.55rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#6b7280;">Chart</span><span style="color:#22d3ee;font-weight:700;">5-second chart</span></div>
+            <div style="height:1px;background:rgba(255,255,255,0.06);"></div>
+            <p style="color:#d1d5db;font-size:0.8rem;">Wait for the first <strong style="color:#22d3ee;">reversal candle</strong> to close — don't jump in early</p>
+            <div style="height:1px;background:rgba(255,255,255,0.06);"></div>
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#10b981;font-size:0.75rem;">▲</span><span style="color:#6b7280;font-size:0.78rem;">Long → stop 1–2 pts below prior low</span></div>
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#ef4444;font-size:0.75rem;">▼</span><span style="color:#6b7280;font-size:0.78rem;">Short → stop 1–2 pts above prior high</span></div>
+              <div style="display:flex;align-items:center;gap:0.5rem;"><span style="color:#fbbf24;font-size:0.75rem;">—</span><span style="color:#6b7280;font-size:0.78rem;">Fixed stop loss: 2–3 pts</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Exit Rules -->
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:1.5rem;">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1.1rem;">
+          <i class="fas fa-door-open" style="color:#fb923c;font-size:0.9rem;"></i>
+          <p style="color:#fff;font-size:0.95rem;font-weight:700;">Exit Rules</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.65rem;">
+          <div style="background:#0d1117;border-radius:0.75rem;padding:0.85rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+            <span style="color:#6b7280;font-size:0.78rem;white-space:nowrap;">+3 pts</span><span style="color:#10b981;font-size:0.78rem;font-weight:600;">Move stop to breakeven</span>
+          </div>
+          <div style="background:#0d1117;border-radius:0.75rem;padding:0.85rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+            <span style="color:#6b7280;font-size:0.78rem;white-space:nowrap;">+5 pts</span><span style="color:#10b981;font-size:0.78rem;font-weight:600;">Move stop to +2 pts</span>
+          </div>
+          <div style="background:#0d1117;border-radius:0.75rem;padding:0.85rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+            <span style="color:#6b7280;font-size:0.78rem;white-space:nowrap;">+8 pts</span><span style="color:#10b981;font-size:0.78rem;font-weight:600;">Consider full exit</span>
+          </div>
+          <div style="background:#0d1117;border-radius:0.75rem;padding:0.85rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+            <span style="color:#6b7280;font-size:0.78rem;white-space:nowrap;">CVD reverses</span><span style="color:#ef4444;font-size:0.78rem;font-weight:600;">Exit immediately</span>
+          </div>
+          <div style="background:#0d1117;border-radius:0.75rem;padding:0.85rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+            <span style="color:#6b7280;font-size:0.78rem;white-space:nowrap;">No move 10–15s</span><span style="color:#ef4444;font-size:0.78rem;font-weight:600;">Exit</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- No-Trade + Risk row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;">
+
+        <!-- No Trade Conditions -->
+        <div style="background:#1a0f0f;border:1px solid rgba(239,68,68,0.35);border-radius:1.25rem;padding:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+            <i class="fas fa-ban" style="color:#ef4444;font-size:0.9rem;"></i>
+            <p style="color:#fff;font-size:0.95rem;font-weight:700;">No-Trade Conditions</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-circle-xmark" style="color:#ef4444;font-size:0.7rem;flex-shrink:0;"></i><span style="color:#9ca3af;font-size:0.78rem;">5 min around major data releases (NFP, CPI, FOMC)</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-circle-xmark" style="color:#ef4444;font-size:0.7rem;flex-shrink:0;"></i><span style="color:#9ca3af;font-size:0.78rem;">Price moving too fast / erratic tape</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-circle-xmark" style="color:#ef4444;font-size:0.7rem;flex-shrink:0;"></i><span style="color:#9ca3af;font-size:0.78rem;">CVD already extremely extended (overbought/oversold)</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-circle-xmark" style="color:#ef4444;font-size:0.7rem;flex-shrink:0;"></i><span style="color:#9ca3af;font-size:0.78rem;">Volume too low</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-circle-xmark" style="color:#ef4444;font-size:0.7rem;flex-shrink:0;"></i><span style="color:#9ca3af;font-size:0.78rem;">News bias unclear</span></div>
+          </div>
+        </div>
+
+        <!-- Risk Management -->
+        <div style="background:#1a1500;border:1px solid rgba(234,179,8,0.35);border-radius:1.25rem;padding:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+            <i class="fas fa-shield-halved" style="color:#eab308;font-size:0.9rem;"></i>
+            <p style="color:#fff;font-size:0.95rem;font-weight:700;">Risk Management</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#6b7280;">Stop loss per trade</span><span style="color:#eab308;font-weight:600;">2–3 pts</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#6b7280;">Target per trade</span><span style="color:#10b981;font-weight:600;">5–8 pts</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span style="color:#6b7280;">Min risk-reward</span><span style="color:#10b981;font-weight:600;">1 : 2</span></div>
+            <div style="height:1px;background:rgba(255,255,255,0.06);"></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-triangle-exclamation" style="color:#ef4444;font-size:0.7rem;"></i><span style="color:#9ca3af;font-size:0.78rem;">3 consecutive losses → stop trading for the day</span></div>
+            <div style="display:flex;align-items:center;gap:0.6rem;"><i class="fas fa-triangle-exclamation" style="color:#ef4444;font-size:0.7rem;"></i><span style="color:#9ca3af;font-size:0.78rem;">Daily max loss hit → stop trading</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Core Principles -->
+      <div style="background:linear-gradient(135deg,rgba(6,182,212,0.08),rgba(168,85,247,0.08));border:1px solid rgba(6,182,212,0.2);border-radius:1.25rem;padding:1.5rem;text-align:center;">
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2rem;">
+          <div><p style="color:#22d3ee;font-size:1rem;font-weight:800;margin-bottom:0.25rem;">Trade Less, Trade Better</p><p style="color:#6b7280;font-size:0.78rem;">Miss it rather than force it</p></div>
+          <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
+          <div><p style="color:#a78bfa;font-size:1rem;font-weight:800;margin-bottom:0.25rem;">Cut Fast, Let Profits Run</p><p style="color:#6b7280;font-size:0.78rem;">Never let a small loss become a big one</p></div>
+          <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
+          <div><p style="color:#10b981;font-size:1rem;font-weight:800;margin-bottom:0.25rem;">Discipline &gt; Skill</p><p style="color:#6b7280;font-size:0.78rem;">Execution determines results</p></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Trade Gallery ── -->
+    <div style="margin-bottom:2.5rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:2rem;">
+        <div style="height:1px;flex:1;background:rgba(255,255,255,0.06);"></div>
+        <span style="color:#6b7280;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;">Real Trade Examples — Order Flow Reads</span>
+        <div style="height:1px;flex:1;background:rgba(255,255,255,0.06);"></div>
+      </div>
+
+      <!-- 7-card unified grid -->
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;">
+
+        <!-- Card 1: bookmap1 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="bookmap1.webp" alt="Seller Absorption at Support" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);color:#fb923c;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Bookmap</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Seller Absorption at Support</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">ESM6 tests a key support level with CVD at −2161. Aggressive sellers hammer the bid, but stacked passive limit orders absorb every hit — price barely moves, signalling an imminent long entry.</p>
+          </div>
+        </div>
+
+        <!-- Card 2: bookmap2 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="bookmap2.webp" alt="Reversal Confirmed" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);color:#fb923c;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Bookmap</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Reversal Confirmed — Buyers In Control</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">CVD flips to +242 as sell aggression dries up. The footprint shows ask-side imbalances stacking at the low — buyers are hitting the offer aggressively, confirming the reversal is underway.</p>
+          </div>
+        </div>
+
+        <!-- Card 3: footprint1 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="footprint1.png" alt="Buy Absorption Reversal" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Absorption</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Buy Absorption Reversal — DAX</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Large bid volume stacks at the bottom rows of the footprint while price holds the low. Red delta confirms sell pressure, yet the level refuses to break — classic buy absorption before a sharp bounce.</p>
+          </div>
+        </div>
+
+        <!-- Card 4: footprint2 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="footprint2.png" alt="Failed Sell Absorption" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Absorption</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Delta Divergence Before Reversal — NQ</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Price prints a lower low but delta diverges — footprint reveals ask imbalances stacking at the low. Sellers are failing to push through; passive absorption morphs into a short-squeeze setup.</p>
+          </div>
+        </div>
+
+        <!-- Card 5: footprint3 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="footprint3.png" alt="High-Volume Rejection Candle" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a78bfa;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Delta</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">High-Volume Rejection Candle — S&amp;P 500</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">A spike candle with massive volume at the wick — the footprint reveals exhaustion selling. Delta turns green after the spike, marking the reversal entry zone with near-perfect precision.</p>
+          </div>
+        </div>
+
+        <!-- Card 6: delta1 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="delta1.png" alt="Bearish Delta Divergence" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a78bfa;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Delta</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Bearish Delta Divergence — S&amp;P 500</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Price grinds higher inside a rising wedge while the delta indicator trends lower — buyers are quietly weakening. This hidden divergence precedes the sharp breakdown visible on the right of the chart.</p>
+          </div>
+        </div>
+
+        <!-- Card 7: delta2 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="delta2.png" alt="Bullish Delta Recovery" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Imbalance</span>
+              <span style="color:#34d399;font-size:0.72rem;font-weight:600;">Beginner</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">Bullish Delta Recovery — S&amp;P 500</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">After a sharp sell-off, delta flips positive while price is still at the low — aggressive buyers step in before price reacts. Waiting for this delta confirmation is the entry trigger I use before going long.</p>
+          </div>
+        </div>
+
+        <!-- Card 8: delta3 -->
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="delta3.png" alt="False Breakout Identification" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a78bfa;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">Delta</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">False Breakout Identification — DAX</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">High volume breakout but delta doesn't confirm — buyers aren't actually stepping in aggressively. This divergence between price and delta is the key tell for identifying a false breakout before the reversal.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── CVD Divergence Examples ── -->
+    <div style="margin-bottom:2.5rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:2rem;">
+        <div style="height:1px;flex:1;background:rgba(255,255,255,0.06);"></div>
+        <span style="color:#6b7280;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;">Additional Examples — CVD Divergence</span>
+        <div style="height:1px;flex:1;background:rgba(255,255,255,0.06);"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:1.25rem;">
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence1.jpg" alt="CVD Divergence 1" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 1</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Price and CVD moving in opposite directions — a key signal that the dominant aggressor is shifting before price reacts.</p>
+          </div>
+        </div>
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence2.jpg" alt="CVD Divergence 2" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 2</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Cumulative Volume Delta diverging from price at a key level — sellers losing control despite price still trending down.</p>
+          </div>
+        </div>
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence7.jpg" alt="CVD Divergence 7" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 3</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Failed breakout confirmed by CVD — price briefly breaks structure but delta collapses immediately, trapping breakout buyers.</p>
+          </div>
+        </div>
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence4.jpg" alt="CVD Divergence 4" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 4</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Bearish CVD divergence at resistance — buyers exhausting at the top while price struggles to push higher.</p>
+          </div>
+        </div>
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence5.jpg" alt="CVD Divergence 5" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#f87171;font-size:0.72rem;font-weight:600;">Advanced</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 5</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Bullish CVD divergence at support — sellers hitting the bid aggressively but CVD turning positive, confirming absorption.</p>
+          </div>
+        </div>
+
+        <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1rem;overflow:hidden;" class="gallery-card">
+          <img src="divergence6.jpg" alt="CVD Divergence 6" style="width:100%;display:block;aspect-ratio:16/10;object-fit:cover;" />
+          <div style="padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <span style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);color:#22d3ee;font-size:0.68rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;text-transform:uppercase;letter-spacing:0.08em;">CVD Divergence</span>
+              <span style="color:#fbbf24;font-size:0.72rem;font-weight:600;">Intermediate</span>
+            </div>
+            <h4 style="color:#fff;font-size:1rem;font-weight:800;margin-bottom:0.5rem;letter-spacing:-0.01em;">CVD Divergence — Example 6</h4>
+            <p style="color:#6b7280;font-size:0.8rem;line-height:1.65;">Multi-candle CVD divergence building — a sustained divergence that precedes a larger directional move rather than a scalp.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Universe & Tools Row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;">
+
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;">
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.5rem;">
+          <i class="fas fa-layer-group" style="color:#10b981;"></i> Instruments Traded
+        </h3>
+        <div style="display:flex;flex-direction:column;gap:0.85rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
+              <div>
+                <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">ES — E-mini S&amp;P 500</p>
+                <p style="color:#4b5563;font-size:0.72rem;">$50 × index · Primary market</p>
+              </div>
+            </div>
+            <span style="color:#10b981;font-size:0.8rem;font-weight:600;">Primary</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;"></div>
+              <div>
+                <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">NQ — E-mini Nasdaq-100</p>
+                <p style="color:#4b5563;font-size:0.72rem;">$20 × index · High volatility</p>
+              </div>
+            </div>
+            <span style="color:#3b82f6;font-size:0.8rem;font-weight:600;">Secondary</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#f97316;"></div>
+              <div>
+                <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">MES / MNQ — Micros</p>
+                <p style="color:#4b5563;font-size:0.72rem;">1/10 size · Testing &amp; sizing</p>
+              </div>
+            </div>
+            <span style="color:#f97316;font-size:0.8rem;font-weight:600;">Practice</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;">
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.5rem;">
+          <i class="fas fa-tools" style="color:#3b82f6;"></i> Platform &amp; Tools
+        </h3>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+          <div style="display:flex;align-items:flex-start;gap:0.6rem;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;margin-top:0.4rem;"></div>
+            <div>
+              <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">Bookmap</p>
+              <p style="color:#4b5563;font-size:0.75rem;line-height:1.5;">Heatmap order book · Absorption &amp; iceberg detection · Liquidity tracker</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:0.6rem;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:0.4rem;"></div>
+            <div>
+              <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">Footprint Charts</p>
+              <p style="color:#4b5563;font-size:0.75rem;line-height:1.5;">Bid/Ask volume per price row · Cumulative delta · Imbalance columns</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:0.6rem;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#a78bfa;flex-shrink:0;margin-top:0.4rem;"></div>
+            <div>
+              <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">Volume Profile (VPOC / VAH / VAL)</p>
+              <p style="color:#4b5563;font-size:0.75rem;line-height:1.5;">Daily &amp; session profiles for context levels and high-value areas</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:0.6rem;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#f97316;flex-shrink:0;margin-top:0.4rem;"></div>
+            <div>
+              <p style="color:#d1d5db;font-size:0.875rem;font-weight:600;">Timeframe</p>
+              <p style="color:#4b5563;font-size:0.75rem;line-height:1.5;">Tick &amp; 1-min chart for entries · 5-min for structure · RTH session only</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== BOOKMAP SIMULATOR ===================== -->
+<section id="simulator" style="padding:6rem 1.5rem;background:rgba(255,255,255,0.015);border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1280px;margin:0 auto;">
+
+    <div style="margin-bottom:2rem;">
+      <p style="color:#f97316;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:0.75rem;">Strategy in Action</p>
+      <h2 style="font-size:2.5rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:1rem;">Absorption Setup — Live Demo</h2>
+      <p style="color:#6b7280;max-width:700px;line-height:1.8;">
+        Interactive demo of how an absorption setup appears on Bookmap. Watch the large passive buy order (bright amber block) hold support while aggressive sellers exhaust —
+        track the CVD divergence — then the reversal entry fires.
+      </p>
+    </div>
+
+    <!-- Canvas container -->
+    <div style="background:#040409;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;overflow:hidden;">
+
+      <!-- Header bar -->
+      <div style="background:#06060e;padding:0.65rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div id="bm-dot" style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div>
+          <span style="color:#6b7280;font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Live Simulation</span>
+          <span style="color:#1f2937;font-size:0.75rem;">·</span>
+          <span style="color:#374151;font-size:0.73rem;">ESM6 · CME Globex · Tick 0.25</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span id="bm-phase-label" style="color:#6b7280;font-size:0.72rem;font-style:italic;"></span>
+          <button id="bm-play" style="background:#111827;border:1px solid #374151;color:#d1d5db;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='#10b981';this.style.color='#10b981'" onmouseout="this.style.borderColor='#374151';this.style.color='#d1d5db'">⏸ Pause</button>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <canvas id="bookmapCanvas" style="display:block;width:100%;cursor:crosshair;"></canvas>
+
+      <!-- Legend bar -->
+      <div style="background:#06060e;border-top:1px solid rgba(255,255,255,0.04);padding:0.6rem 1.25rem;display:flex;flex-wrap:wrap;align-items:center;gap:1.1rem;">
+        <span style="color:#2d3748;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Legend</span>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:36px;height:9px;border-radius:2px;background:linear-gradient(to right,#0b0b35,#1a40a0,#1bc4d0,#ffd000,#ff3300);"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Order size (thin → large)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:18px;height:1.5px;background:rgba(255,255,255,0.85);border-radius:1px;"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Market price</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Buy aggression</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Sell aggression</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:18px;border-top:1.5px dashed #f97316;"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">POC</span>
+        </div>
+        <span style="color:#2d3748;font-size:0.71rem;margin-left:auto;">CVD = Cumulative Volume Delta · heatmap scrolls right→left</span>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== FOOTPRINT CHART ===================== -->
+<section id="dashboard" style="padding:6rem 1.5rem;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1280px;margin:0 auto;">
+
+    <div style="margin-bottom:2rem;">
+      <p style="color:#3b82f6;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:0.75rem;">Order Flow Tool</p>
+      <h2 style="font-size:2.5rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:1rem;">Footprint Chart — Live Demo</h2>
+      <p style="color:#6b7280;max-width:700px;line-height:1.8;">
+        Interactive demo of a Footprint chart showing <strong style="color:#d1d5db;">Bid × Ask</strong> volume at each price level per candle.
+        Watch for delta divergence and stacked imbalances (highlighted cells) signalling absorption before the reversal entry.
+      </p>
+    </div>
+
+    <!-- Canvas container -->
+    <div style="background:#0a0c14;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;overflow:hidden;">
+
+      <!-- Header bar -->
+      <div style="background:#07080f;padding:0.65rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div id="fp-dot" style="width:8px;height:8px;border-radius:50%;background:#ef4444;animation:pulse 1.8s infinite;"></div>
+          <span style="color:#6b7280;font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Live Simulation</span>
+          <span style="color:#1f2937;font-size:0.75rem;">·</span>
+          <span style="color:#374151;font-size:0.73rem;">ESM6 · Tick Chart · Bid × Ask</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span id="fp-phase-label" style="color:#6b7280;font-size:0.72rem;font-style:italic;"></span>
+          <button id="fp-play" style="background:#111827;border:1px solid #374151;color:#d1d5db;font-size:0.75rem;font-weight:600;padding:0.3rem 0.85rem;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='#3b82f6';this.style.color='#3b82f6'" onmouseout="this.style.borderColor='#374151';this.style.color='#d1d5db'">⏸ Pause</button>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <canvas id="footprintCanvas" style="display:block;width:100%;cursor:crosshair;"></canvas>
+
+      <!-- Legend bar -->
+      <div style="background:#07080f;border-top:1px solid rgba(255,255,255,0.04);padding:0.6rem 1.25rem;display:flex;flex-wrap:wrap;align-items:center;gap:1.1rem;">
+        <span style="color:#2d3748;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Legend</span>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:30px;height:12px;border-radius:2px;background:rgba(34,197,94,0.24);border:1.5px solid rgba(34,197,94,0.55);"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Ask Imbalance ≥3:1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:30px;height:12px;border-radius:2px;background:rgba(239,68,68,0.24);border:1.5px solid rgba(239,68,68,0.55);"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">Bid Imbalance ≥3:1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:30px;height:12px;border-radius:2px;background:rgba(249,115,22,0.20);border:1px solid rgba(249,115,22,0.45);"></div>
+          <span style="color:#4b5563;font-size:0.71rem;">POC (highest volume row)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span style="color:#10b981;font-size:0.78rem;font-weight:700;">+Δ</span>
+          <span style="color:#4b5563;font-size:0.71rem;">Positive delta (buyers)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span style="color:#ef4444;font-size:0.78rem;font-weight:700;">−Δ</span>
+          <span style="color:#4b5563;font-size:0.71rem;">Negative delta (sellers)</span>
+        </div>
+        <span style="color:#2d3748;font-size:0.71rem;margin-left:auto;">bid × ask per price row · imbalance ratio ≥ 3:1</span>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== PERFORMANCE ===================== -->
+<section id="performance" style="padding:6rem 1.5rem;background:rgba(255,255,255,0.015);border-top:1px solid rgba(255,255,255,0.06);">
+  <div style="max-width:1280px;margin:0 auto;">
+
+    <div style="margin-bottom:3rem;">
+      <p style="color:#10b981;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:0.75rem;">Track Record</p>
+      <h2 style="font-size:2.5rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:1rem;">Performance</h2>
+      <p style="color:#6b7280;line-height:1.75;">Live trading results from January 2024 to May 2025 · Starting capital: <span style="color:#fff;font-weight:600;">$25,000</span></p>
+    </div>
+
+    <!-- Stats Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:2rem;">
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Total Return</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#10b981;">+48.4%</p>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Total P&amp;L</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#10b981;">+$12,100</p>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Win Rate</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#10b981;">73.3%</p>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Sharpe Ratio</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#3b82f6;">2.36</p>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Max Drawdown</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#f97316;">−4.8%</p>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:0.875rem;padding:1.25rem;text-align:center;">
+        <p style="color:#6b7280;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">Profit Factor</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#3b82f6;">2.9×</p>
+      </div>
+    </div>
+
+    <!-- Equity Curve Chart -->
+    <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;margin-bottom:1.5rem;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:0.25rem;">Equity Curve</h3>
+          <p style="color:#6b7280;font-size:0.8rem;">Portfolio value over time</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:1.25rem;">
+          <div style="display:flex;align-items:center;gap:0.4rem;"><div style="width:12px;height:3px;border-radius:2px;background:#10b981;"></div><span style="color:#6b7280;font-size:0.8rem;">Portfolio</span></div>
+          <div style="display:flex;align-items:center;gap:0.4rem;"><div style="width:12px;height:3px;border-radius:2px;background:#4b5563;"></div><span style="color:#6b7280;font-size:0.8rem;">S&amp;P 500</span></div>
+        </div>
+      </div>
+      <canvas id="equityChart" height="90"></canvas>
+    </div>
+
+    <!-- Monthly + Allocation -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;">
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;">
+        <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:0.25rem;">Monthly Returns</h3>
+        <p style="color:#6b7280;font-size:0.8rem;margin-bottom:1.5rem;">Month-over-month P&amp;L %</p>
+        <canvas id="monthlyChart" height="130"></canvas>
+      </div>
+      <div style="background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:1.25rem;padding:2rem;">
+        <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:0.25rem;">Instrument Mix</h3>
+        <p style="color:#6b7280;font-size:0.8rem;margin-bottom:1.5rem;">By contract traded</p>
+        <div style="display:flex;justify-content:center;margin-bottom:1.25rem;">
+          <canvas id="allocationChart" style="max-width:160px;max-height:160px;"></canvas>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:10px;height:10px;border-radius:50%;background:#10b981;"></div><span style="color:#9ca3af;">ES (S&amp;P 500)</span></div>
+            <span style="font-weight:600;">60%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:10px;height:10px;border-radius:50%;background:#3b82f6;"></div><span style="color:#9ca3af;">NQ (Nasdaq)</span></div>
+            <span style="font-weight:600;">25%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:10px;height:10px;border-radius:50%;background:#f97316;"></div><span style="color:#9ca3af;">MES / MNQ (Micro)</span></div>
+            <span style="font-weight:600;">15%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer style="border-top:1px solid rgba(255,255,255,0.06);padding:2.5rem 1.5rem;">
+  <div style="max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:30px;height:30px;background:#10b981;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+        <i class="fas fa-chart-line" style="color:#fff;font-size:12px;"></i>
+      </div>
+      <span style="font-weight:700;font-size:0.95rem;">TradeFolio</span>
+      <span style="color:#374151;margin:0 0.25rem;">·</span>
+      <span style="color:#6b7280;font-size:0.85rem;">Trading Strategy</span>
+    </div>
+    <p style="color:#4b5563;font-size:0.75rem;text-align:center;">Past performance does not guarantee future results. For informational purposes only.</p>
+  </div>
+</footer>
+
+<!-- ================================================================
+     JAVASCRIPT
+     ================================================================ -->
+<script>
+
+/* ──────────────────────────────────────────────
+   CHART DATA
+────────────────────────────────────────────── */
+const equityLabels    = ["Jan'24","Feb'24","Mar'24","Apr'24","May'24","Jun'24","Jul'24","Aug'24","Sep'24","Oct'24","Nov'24","Dec'24","Jan'25","Feb'25","Mar'25","Apr'25","May'25"];
+const equityPortfolio = [25000,25890,26720,27270,27830,29790,29410,28810,29630,30390,31830,32600,32200,33410,34380,35180,37100];
+const equityBenchmark = [25000,25450,25775,26300,26950,27625,27700,27400,28100,29050,29950,30375,30200,30800,31250,31700,32000];
+
+const monthlyLabels  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
+const monthlyReturns = [3.56,3.21,2.06,2.05,7.04,-1.28,-2.04,2.85,2.56,4.74,2.42,-1.23,3.76,2.90,2.33,5.46];
+
+/* ──────────────────────────────────────────────
+   CHARTS INIT
+────────────────────────────────────────────── */
+function initCharts() {
+  Chart.defaults.color       = '#6b7280';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
+  Chart.defaults.font.family = 'Inter, sans-serif';
+
+  /* Equity Curve */
+  const eCtx = document.getElementById('equityChart').getContext('2d');
+  const grad = eCtx.createLinearGradient(0,0,0,350);
+  grad.addColorStop(0,'rgba(16,185,129,0.28)');
+  grad.addColorStop(1,'rgba(16,185,129,0)');
+  new Chart(eCtx,{
+    type:'line',
+    data:{
+      labels:equityLabels,
+      datasets:[
+        { label:'Portfolio', data:equityPortfolio, borderColor:'#10b981', backgroundColor:grad, fill:true, tension:0.4, pointRadius:3, pointHoverRadius:7, borderWidth:2.5 },
+        { label:'S&P 500',   data:equityBenchmark, borderColor:'#4b5563', backgroundColor:'transparent', fill:false, tension:0.4, pointRadius:2, pointHoverRadius:5, borderWidth:1.5, borderDash:[6,4] }
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: ctx => ` $${ctx.parsed.y.toLocaleString()}` } }
+      },
+      scales:{
+        x:{ grid:{ color:'rgba(255,255,255,0.03)' }, ticks:{ font:{size:11} } },
+        y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback: v=>'$'+(v/1000).toFixed(1)+'k', font:{size:11} } }
+      }
+    }
+  });
+
+  /* Monthly Returns */
+  new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{
+      labels:monthlyLabels,
+      datasets:[{ label:'Return %', data:monthlyReturns,
+        backgroundColor: monthlyReturns.map(v=>v>=0?'rgba(16,185,129,0.8)':'rgba(239,68,68,0.8)'),
+        borderRadius:5, borderSkipped:false }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(2)}%` } }
+      },
+      scales:{
+        x:{ grid:{ display:false }, ticks:{ font:{size:11} } },
+        y:{ grid:{ color:'rgba(255,255,255,0.05)' }, ticks:{ callback:v=>v+'%', font:{size:11} } }
+      }
+    }
+  });
+
+  /* Asset Allocation Donut */
+  new Chart(document.getElementById('allocationChart'),{
+    type:'doughnut',
+    data:{
+      labels:['ES (S&P 500)','NQ (Nasdaq)','MES/MNQ (Micro)'],
+      datasets:[{ data:[60,25,15], backgroundColor:['#10b981','#3b82f6','#f97316'], borderWidth:0, hoverOffset:6 }]
+    },
+    options:{
+      responsive:true, cutout:'70%',
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.parsed}%` } } }
+    }
+  });
+}
+
+initCharts();
+
+</script>
+
+<script>
+/* ================================================================
+   FOOTPRINT CHART SIMULATOR
+   ================================================================ */
+;(function () {
+  const canvas = document.getElementById('footprintCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dot = document.getElementById('fp-dot');
+  const lbl = document.getElementById('fp-phase-label');
+
+  /* ── constants ─────────────────────────────────────────────── */
+  const TICK       = 0.25;
+  const BASE       = 5450.00;
+  const N_ROWS     = 14;   // visible price rows
+  const N_CANDS    = 9;    // total visible candle columns
+  const SIM_PER_C  = 24;   // sim steps per candle close
+  const FRAME_SKIP = 3;    // advance every N animation frames
+
+  /* layout */
+  const PL = 66, PR = 10, PT = 20, PB = 62;
+  let DW = 0, DH = 460;
+
+  /* ── scenario phases (dur = number of candles) ──────────────── */
+  const PHASES = [
+    { name:'normal',     dur:3, lbl:'',                                       clr:'' },
+    { name:'selling',    dur:2, lbl:'⚠️  Selling Pressure',                   clr:'#fbbf24' },
+    { name:'absorption', dur:3, lbl:'🎯  Absorption — Delta Diverging',        clr:'#f97316' },
+    { name:'reversal',   dur:2, lbl:'✅  Entry Signal — Long',                 clr:'#10b981' },
+    { name:'squeeze',    dur:2, lbl:'🏆  Target Hit  +8 ticks',               clr:'#34d399' },
+  ];
+
+  /* ── state ──────────────────────────────────────────────────── */
+  let completed     = [];   // finished candle objects
+  let forming       = null; // candle being built right now
+  let formStep      = 0;    // steps elapsed in forming candle
+  let phase         = 0;
+  let candleInPhase = 0;
+  let currentTick   = 0;   // price offset in ticks from BASE
+  let statusMsg     = '';
+  let statusClr     = '';
+  let statusFade    = 0;
+  let playing       = true;
+  let frameCount    = 0;
+
+  const rnd   = n  => Math.floor(Math.random() * n);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ── price movement per sim step ────────────────────────────── */
+  function movePrice(phaseName) {
+    const r = Math.random();
+    switch (phaseName) {
+      case 'normal':     return currentTick + (r < 0.10 ? -1 : r < 0.90 ? 0 :  1);
+      case 'selling':    return currentTick + (r < 0.28 ? -1 : r < 0.95 ? 0 :  1);
+      case 'absorption': return currentTick + (r < 0.10 ? -1 : r < 0.88 ? 0 :  1);
+      case 'reversal':   return currentTick + (r < 0.10 ? -1 : r < 0.65 ? 0 :  1);
+      case 'squeeze':    return currentTick + (r < 0.06 ? -1 : r < 0.74 ? 0 :  1);
+    }
+    return currentTick;
+  }
+
+  /* ── bid/ask volume at current tick ────────────────────────── */
+  function stepVolume(phaseName) {
+    const base = 55 + rnd(80);
+    switch (phaseName) {
+      case 'normal':     return { bid: base + rnd(60),        ask: base + rnd(60) };
+      case 'selling':    return { bid: base + rnd(200) + 60,  ask: base + rnd(40) };
+      /* absorption: heavy selling absorbed by large passive buys */
+      case 'absorption': return { bid: base + rnd(280) + 90,  ask: base + rnd(260) + 80 };
+      case 'reversal':   return { bid: base + rnd(50),         ask: base + rnd(290) + 110 };
+      case 'squeeze':    return { bid: base + rnd(70),         ask: base + rnd(190) + 80 };
+    }
+    return { bid: base, ask: base };
+  }
+
+  /* ── close forming candle → push to completed ───────────────── */
+  function closeCandle() {
+    if (forming) {
+      forming.close = currentTick;
+      /* compute POC */
+      let pocRow = currentTick, pocVol = 0;
+      for (const [t, v] of Object.entries(forming.rows)) {
+        if (v.bid + v.ask > pocVol) { pocVol = v.bid + v.ask; pocRow = +t; }
+      }
+      forming.poc = pocRow;
+      completed.push({ ...forming });
+      if (completed.length > N_CANDS - 1) completed.shift();
+    }
+    candleInPhase++;
+    if (candleInPhase >= PHASES[phase].dur) {
+      phase = (phase + 1) % PHASES.length;
+      candleInPhase = 0;
+      if (phase === 0) currentTick = clamp(currentTick, -25, 25);
+    }
+    forming = {
+      open: currentTick, close: currentTick,
+      high: currentTick, low: currentTick,
+      rows: {}, delta: 0, poc: currentTick,
+      phaseName: PHASES[phase].name
+    };
+    formStep = 0;
+  }
+
+  /* ── advance one simulation step ────────────────────────────── */
+  function advance() {
+    const ph = PHASES[phase];
+
+    if (!forming) {
+      forming = {
+        open: currentTick, close: currentTick,
+        high: currentTick, low: currentTick,
+        rows: {}, delta: 0, poc: currentTick,
+        phaseName: ph.name
+      };
+    }
+
+    currentTick = clamp(movePrice(ph.name), -35, 35);
+
+    forming.high  = Math.max(forming.high, currentTick);
+    forming.low   = Math.min(forming.low,  currentTick);
+    forming.close = currentTick;
+
+    const { bid, ask } = stepVolume(ph.name);
+    const ex = forming.rows[currentTick] || { bid: 0, ask: 0 };
+    forming.rows[currentTick] = { bid: ex.bid + bid, ask: ex.ask + ask };
+    forming.delta += ask - bid;
+
+    /* update POC */
+    let pocRow = currentTick, pocVol = 0;
+    for (const [t, v] of Object.entries(forming.rows)) {
+      if (v.bid + v.ask > pocVol) { pocVol = v.bid + v.ask; pocRow = +t; }
+    }
+    forming.poc = pocRow;
+
+    /* status overlay */
+    if (ph.lbl) { statusMsg = ph.lbl; statusClr = ph.clr; statusFade = Math.min(1, statusFade + 0.12); }
+    else         { statusFade = Math.max(0, statusFade - 0.03); }
+    if (lbl) lbl.textContent = ph.lbl ? ph.lbl.replace(/^[^\s]+\s/, '') : '';
+    if (dot) dot.style.background =
+      ph.name === 'absorption' ? '#f97316' :
+      (ph.name === 'reversal' || ph.name === 'squeeze') ? '#10b981' : '#ef4444';
+
+    formStep++;
+    if (formStep >= SIM_PER_C) closeCandle();
+  }
+
+  /* ── draw one candle column ──────────────────────────────────── */
+  function drawCandle(candle, x, colW, rowH, rowMin) {
+    if (!candle) return;
+
+    for (let ri = 0; ri < N_ROWS; ri++) {
+      const t   = rowMin + ri;
+      const row = candle.rows[t];
+      const y   = PT + (N_ROWS - 1 - ri) * rowH;
+
+      const isPOC = t === candle.poc;
+
+      if (row) {
+        const { bid, ask } = row;
+        const isAskImb = ask >= bid * 3 && (bid + ask) > 60;
+        const isBidImb = bid >= ask * 3 && (bid + ask) > 60;
+        const askDom   = ask > bid * 1.5 && !isBidImb;
+        const bidDom   = bid > ask * 1.5 && !isAskImb;
+
+        /* cell background */
+        let bg = null;
+        if      (isPOC)    bg = 'rgba(249,115,22,0.20)';
+        else if (isAskImb) bg = 'rgba(34,197,94,0.24)';
+        else if (isBidImb) bg = 'rgba(239,68,68,0.24)';
+        else if (askDom)   bg = 'rgba(34,197,94,0.07)';
+        else if (bidDom)   bg = 'rgba(239,68,68,0.07)';
+
+        if (bg) {
+          ctx.fillStyle = bg;
+          ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
+        }
+
+        /* imbalance border */
+        if (isAskImb || isBidImb) {
+          ctx.strokeStyle = isAskImb ? 'rgba(34,197,94,0.60)' : 'rgba(239,68,68,0.60)';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x + 1.75, y + 1.75, colW - 3.5, rowH - 3.5);
+        }
+
+        /* text */
+        const fs  = Math.max(7.5, Math.min(10.5, rowH * 0.40));
+        ctx.font = `${fs}px 'Inter', monospace`;
+        const fmtV   = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v);
+        const midY   = y + rowH * 0.67;
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = isBidImb ? '#f87171' : bidDom ? '#fca5a5' : '#4b5563';
+        ctx.fillText(fmtV(bid), x + 4, midY);
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = isAskImb ? '#4ade80' : askDom ? '#86efac' : '#4b5563';
+        ctx.fillText(fmtV(ask), x + colW - 4, midY);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#2d3748';
+        ctx.fillText('×', x + colW / 2, midY);
+
+      } else if (t >= candle.low && t <= candle.high) {
+        /* price traded here but no volume this row → thin fill */
+        ctx.fillStyle = 'rgba(255,255,255,0.012)';
+        ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
+      }
+
+      /* POC label in cell top-left */
+      if (isPOC) {
+        ctx.fillStyle = '#f97316';
+        ctx.font = `bold 7px Inter, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText('POC', x + 3, y + 8);
+      }
+    }
+
+    /* thin OHLC range bar on right edge of column */
+    const hiRI = clamp(candle.high - rowMin, 0, N_ROWS - 1);
+    const loRI = clamp(candle.low  - rowMin, 0, N_ROWS - 1);
+    const hiY  = PT + (N_ROWS - 1 - hiRI) * rowH;
+    const loY  = PT + (N_ROWS     - loRI) * rowH;
+    if (loY > hiY) {
+      ctx.fillStyle = candle.delta >= 0 ? 'rgba(16,185,129,0.65)' : 'rgba(239,68,68,0.65)';
+      ctx.fillRect(x + colW - 3, hiY, 3, loY - hiY);
+    }
+  }
+
+  /* ── main render ─────────────────────────────────────────────── */
+  function render() {
+    ctx.fillStyle = '#0a0c14';
+    ctx.fillRect(0, 0, DW, DH);
+
+    const allCands = [...completed];
+    if (forming) allCands.push(forming);
+    if (allCands.length === 0) return;
+
+    const chartW = DW - PL - PR;
+    const chartH = DH - PT - PB;
+    const colW   = chartW / N_CANDS;
+    const rowH   = chartH / N_ROWS;
+    const rowMin = Math.round(currentTick - N_ROWS / 2);
+
+    /* grid */
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 0.5;
+    for (let r = 0; r <= N_ROWS; r++) {
+      const y = PT + r * rowH;
+      ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(DW - PR, y); ctx.stroke();
+    }
+    for (let c = 0; c <= N_CANDS; c++) {
+      const xg = PL + c * colW;
+      ctx.beginPath(); ctx.moveTo(xg, PT); ctx.lineTo(xg, PT + chartH); ctx.stroke();
+    }
+
+    /* current price row highlight */
+    const cpRI = currentTick - rowMin;
+    if (cpRI >= 0 && cpRI < N_ROWS) {
+      ctx.fillStyle = 'rgba(16,185,129,0.055)';
+      ctx.fillRect(PL, PT + (N_ROWS - 1 - cpRI) * rowH, chartW, rowH);
+    }
+
+    /* candles */
+    const startIdx = Math.max(0, allCands.length - N_CANDS);
+    for (let i = startIdx; i < allCands.length; i++) {
+      const ci = i - startIdx;
+      drawCandle(allCands[i], PL + ci * colW, colW, rowH, rowMin);
+    }
+
+    /* forming candle blue outline */
+    const fi = Math.min(allCands.length - 1, N_CANDS - 1);
+    ctx.strokeStyle = 'rgba(59,130,246,0.28)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(PL + fi * colW + 1, PT + 1, colW - 2, chartH - 2);
+
+    /* price axis */
+    ctx.textAlign = 'right';
+    for (let ri = 0; ri < N_ROWS; ri++) {
+      const t     = rowMin + ri;
+      const price = (BASE + t * TICK).toFixed(2);
+      const y     = PT + (N_ROWS - 1 - ri) * rowH + rowH / 2;
+      const isCP  = t === currentTick;
+      ctx.fillStyle = isCP ? '#e2e8f0' : '#2d3748';
+      ctx.font = `${isCP ? 'bold ' : ''}9.5px Inter, monospace`;
+      ctx.fillText(price, PL - 3, y + 3.5);
+    }
+
+    /* current price badge */
+    if (cpRI >= 0 && cpRI < N_ROWS) {
+      const badgeY = PT + (N_ROWS - 1 - cpRI) * rowH + rowH / 2;
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(1, badgeY - 9, 60, 18, 3);
+      else ctx.rect(1, badgeY - 9, 60, 18);
+      ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 9px Inter, monospace'; ctx.textAlign = 'center';
+      ctx.fillText((BASE + currentTick * TICK).toFixed(2), 31, badgeY + 3.5);
+    }
+
+    /* ── delta bars ── */
+    const dY0  = DH - PB + 6;
+    const dH   = PB - 22;
+    const dMid = dY0 + dH / 2;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.012)'; ctx.fillRect(PL, dY0, chartW, dH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(PL, dMid); ctx.lineTo(DW - PR, dMid); ctx.stroke();
+
+    ctx.fillStyle = '#1e2030'; ctx.font = '9px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('Δ Delta', PL + 4, dY0 + 10);
+
+    const visCands   = allCands.slice(-N_CANDS);
+    const maxAbsDelta = Math.max(1, ...visCands.map(c => Math.abs(c.delta)));
+
+    for (let i = 0; i < visCands.length; i++) {
+      const c  = visCands[i];
+      const bw = Math.max(2, colW * 0.46);
+      const bh = Math.abs(c.delta) / maxAbsDelta * (dH / 2 - 5);
+      const bx = PL + i * colW + (colW - bw) / 2;
+      const by = c.delta >= 0 ? dMid - bh : dMid;
+      ctx.fillStyle = c.delta >= 0 ? 'rgba(16,185,129,0.78)' : 'rgba(239,68,68,0.78)';
+      ctx.fillRect(bx, by, bw, bh || 1);
+
+      /* delta number */
+      const dAbs = Math.abs(c.delta);
+      const dStr = (c.delta >= 0 ? '+' : '−') + (dAbs >= 1000 ? (dAbs / 1000).toFixed(1) + 'k' : dAbs.toFixed(0));
+      ctx.fillStyle  = c.delta >= 0 ? '#10b981' : '#ef4444';
+      ctx.font       = '8px Inter, monospace'; ctx.textAlign = 'center';
+      const dtY = c.delta >= 0 ? dMid - bh - 2 : dMid + bh + 9;
+      ctx.fillText(dStr, PL + i * colW + colW / 2, dtY);
+    }
+
+    /* ── status overlay ── */
+    if (statusFade > 0.03 && statusMsg) {
+      ctx.globalAlpha = Math.min(1, statusFade);
+      ctx.font = 'bold 12px Inter, sans-serif';
+      const tw = ctx.measureText(statusMsg).width;
+      const bw = tw + 28, bh = 29, bx = PL + chartW - bw - 10, by = PT + 10;
+      ctx.fillStyle = 'rgba(10,12,20,0.9)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 4); else ctx.rect(bx, by, bw, bh);
+      ctx.fill();
+      ctx.strokeStyle = statusClr; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 4); else ctx.rect(bx, by, bw, bh);
+      ctx.stroke();
+      ctx.fillStyle = statusClr; ctx.textAlign = 'left';
+      ctx.fillText(statusMsg, bx + 12, by + 20);
+      ctx.globalAlpha = 1;
+    }
+
+    /* footer strip */
+    ctx.fillStyle = '#07080f'; ctx.fillRect(0, DH - 18, DW, 18);
+    ctx.fillStyle = '#252535'; ctx.font = '9px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('ESM6  ·  Tick Chart  ·  Bid × Ask Volume per Row  ·  Simulated Order Flow', PL, DH - 5);
+
+    /* phase progress dots */
+    PHASES.forEach((p, i) => {
+      const px = DW - PHASES.length * 16 - 8 + i * 16, py = DH - 9;
+      ctx.fillStyle = i === phase ? (statusClr || '#3b82f6') : '#151a28';
+      ctx.beginPath(); ctx.arc(px, py, i === phase ? 4.5 : 3, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  /* ── resize (DPR-aware) ──────────────────────────────────────── */
+  function resize() {
+    const d = Math.min(window.devicePixelRatio || 1, 2);
+    DW = canvas.parentElement.clientWidth;
+    DH = 460;
+    canvas.width  = Math.round(DW * d);
+    canvas.height = Math.round(DH * d);
+    canvas.style.width  = DW + 'px';
+    canvas.style.height = DH + 'px';
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+
+  /* ── play / pause ────────────────────────────────────────────── */
+  const btn = document.getElementById('fp-play');
+  if (btn) btn.addEventListener('click', () => {
+    playing = !playing;
+    btn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  });
+
+  /* ── animation loop ──────────────────────────────────────────── */
+  function loop() {
+    requestAnimationFrame(loop);
+    frameCount++;
+    if (playing && frameCount % FRAME_SKIP === 0) advance();
+    render();
+  }
+
+  /* ── init: pre-seed 8 complete candles ───────────────────────── */
+  window.addEventListener('resize', resize);
+  resize();
+  for (let s = 0; s < (N_CANDS - 1) * SIM_PER_C; s++) advance();
+  loop();
+})();
+</script>
+
+<script>
+/* ================================================================
+   BOOKMAP ORDER FLOW SIMULATOR
+   ================================================================ */
+;(function () {
+  const canvas = document.getElementById('bookmapCanvas');
+  if (!canvas) return;
+  const ctx  = canvas.getContext('2d');
+  const dot  = document.getElementById('bm-dot');
+  const lbl  = document.getElementById('bm-phase-label');
+
+  /* ── tuneable constants ────────────────────────────────────── */
+  const TICK    = 0.25;
+  const BASE    = 5450.00;   // displayed base price
+  const N_TICKS = 54;        // visible price rows
+  const N_COLS  = 150;       // visible time columns
+  const TPF     = 1;         // ticks-per-animation-frame
+
+  /* layout margins (CSS px) */
+  const PL = 72, PR = 82, PT = 14, PB = 92;
+
+  /* ── display state ─────────────────────────────────────────── */
+  let DW = 0, DH = 460;
+
+  /* ── data buffers (circular, length ≤ N_COLS) ─────────────── */
+  const bookBuf  = [];   // Float32Array per column
+  const priceBuf = [];   // tick-index per column
+  const cvdBuf   = [];   // CVD value per column
+  const tradeBuf = [];   // {ci, tick, side, sz}
+
+  let priceTick = N_TICKS / 2;
+  let cvd       = 0;
+  let totalCols = 0;
+
+  /* ── scenario state ────────────────────────────────────────── */
+  let phase     = 0;
+  let phaseStep = 0;
+  let absorbTick = -1;
+  let absorbSize =  0;
+  let statusMsg  = '';
+  let statusClr  = '';
+  let statusFade =  0;
+
+  const PHASES = [
+    { dur:55, n:'normal',     lbl:'',                                        clr:'' },
+    { dur:12, n:'spawn',      lbl:'🔵  Large Passive Buy Detected',           clr:'#60a5fa' },
+    { dur:28, n:'approach',   lbl:'⚠️  Sellers Approaching Support',           clr:'#fbbf24' },
+    { dur:34, n:'absorption', lbl:'🎯  Absorption — Sellers Exhausting',       clr:'#f97316' },
+    { dur:16, n:'reversal',   lbl:'✅  Entry Signal — Long  (Stop −2 ticks)', clr:'#10b981' },
+    { dur:22, n:'squeeze',    lbl:'🏆  Target Hit  +8 ticks',                clr:'#34d399' },
+  ];
+
+  /* ── helpers ───────────────────────────────────────────────── */
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const rnd   = max => Math.floor(Math.random() * max);
+
+  /* ── column generator ──────────────────────────────────────── */
+  function makeCol(phaseN) {
+    const col = new Float32Array(N_TICKS);
+    for (let t = 0; t < N_TICKS; t++) {
+      const d = Math.abs(t - priceTick);
+      if (d < 2) { col[t] = 0; continue; }
+
+      /* large absorbing order */
+      if (absorbTick >= 0 && t === absorbTick &&
+          (phaseN === 'spawn' || phaseN === 'approach' || phaseN === 'absorption')) {
+        col[t] = absorbSize;
+        continue;
+      }
+
+      /* realistic clustering: denser orders cluster near market price */
+      const proximity = Math.max(0, 1 - d / (N_TICKS * 0.45));
+      const r = Math.random();
+      if (phaseN === 'absorption' && d < 9) {
+        col[t] = r < 0.20 ? 0 : rnd(400) + 80;
+      } else {
+        const bias = proximity * 0.22;
+        if      (r < 0.30 - bias) col[t] = 0;
+        else if (r < 0.58 - bias) col[t] = rnd(60)  + 5;
+        else if (r < 0.82)        col[t] = rnd(160) + 30 + ~~(proximity * 90);
+        else                       col[t] = rnd(320) + 100 + ~~(proximity * 180);
+      }
+    }
+    return col;
+  }
+
+  /* ── advance one time-step ─────────────────────────────────── */
+  function advance() {
+    const sc = PHASES[phase];
+    let move = 0, side = 0, sz = rnd(200) + 60;
+
+    switch (sc.n) {
+      case 'normal':
+        move = (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.55 ? 1 : 0);
+        side = move;
+        if (phaseStep === sc.dur - 6) {
+          absorbTick = clamp(Math.round(priceTick) - 11, 8, N_TICKS - 12);
+          absorbSize = 960;
+        }
+        break;
+
+      case 'spawn':
+        move = Math.random() < 0.35 ? 1 : Math.random() < 0.35 ? -1 : 0;
+        side = move;
+        break;
+
+      case 'approach': {
+        const tgt = absorbTick + 4;
+        const toward = priceTick > tgt ? -1 : 0;
+        move = clamp(toward - (Math.random() < 0.45 ? 1 : 0), -2, 1);
+        side = -1; sz += 260;
+        break;
+      }
+
+      case 'absorption': {
+        const lo = absorbTick, hi = absorbTick + 4;
+        if      (priceTick <= lo) move = 1;
+        else if (priceTick >= hi) move = -1;
+        else move = Math.random() < 0.45 ? -1 : Math.random() < 0.6 ? 1 : 0;
+        side = -1; sz += rnd(430) + 220;
+        absorbSize = clamp(absorbSize - rnd(14), 640, 980);
+        break;
+      }
+
+      case 'reversal':
+        move = (Math.random() < 0.82 ? 1 : 0) + (Math.random() < 0.55 ? 1 : 0);
+        side = 1; sz += 380;
+        break;
+
+      case 'squeeze':
+        move = Math.random() < 0.72 ? 1 : 0;
+        side = 1; sz += rnd(210);
+        break;
+    }
+
+    priceTick = clamp(priceTick + move, 8, N_TICKS - 9);
+    cvd += side * sz;
+
+    bookBuf.push(makeCol(sc.n));
+    priceBuf.push(priceTick);
+    cvdBuf.push(cvd);
+    if (side !== 0) tradeBuf.push({ ci: totalCols, tick: priceTick, side, sz });
+
+    if (bookBuf.length  > N_COLS) bookBuf.shift();
+    if (priceBuf.length > N_COLS) priceBuf.shift();
+    if (cvdBuf.length   > N_COLS) cvdBuf.shift();
+    while (tradeBuf.length && tradeBuf[0].ci < totalCols - N_COLS + 2) tradeBuf.shift();
+
+    totalCols++;
+    phaseStep++;
+
+    /* status overlay */
+    if (sc.lbl) { statusMsg = sc.lbl; statusClr = sc.clr; statusFade = Math.min(1, statusFade + 0.18); }
+    else         { statusFade = Math.max(0, statusFade - 0.04); }
+
+    /* dot colour */
+    if (dot) dot.style.background =
+      sc.n === 'absorption' ? '#f97316' :
+      (sc.n === 'reversal' || sc.n === 'squeeze') ? '#10b981' : '#ef4444';
+
+    /* phase label */
+    if (lbl) lbl.textContent = sc.lbl ? sc.lbl.replace(/^[^\s]+\s/, '') : '';
+
+    /* advance phase */
+    if (phaseStep >= sc.dur) {
+      phase = (phase + 1) % PHASES.length;
+      phaseStep = 0;
+      if (phase === 0) { cvd = 0; absorbTick = -1; absorbSize = 0; }
+    }
+  }
+
+  /* ── heat-colour mapping ───────────────────────────────────── */
+  function heatRGBA(size) {
+    if (size <= 0) return null;
+    const t = Math.min(size / 500, 1);
+    /* True Bookmap palette: black → navy → blue → vivid cyan (dominant) → teal → yellow → orange → bright red */
+    if (t < 0.03) { const s=t/.03;           return `rgba(0,${~~(2+8*s)},${~~(10+25*s)},${(.08+.12*s).toFixed(2)})`; }
+    if (t < 0.12) { const s=(t-.03)/.09;     return `rgba(0,${~~(10+32*s)},${~~(35+85*s)},${(.22+.22*s).toFixed(2)})`; }
+    if (t < 0.28) { const s=(t-.12)/.16;     return `rgba(0,${~~(42+108*s)},${~~(120+110*s)},${(.44+.24*s).toFixed(2)})`; }
+    if (t < 0.48) { const s=(t-.28)/.20;     return `rgba(${~~(0+90*s)},${~~(150+85*s)},${~~(230-50*s)},${(.68+.18*s).toFixed(2)})`; }
+    if (t < 0.65) { const s=(t-.48)/.17;     return `rgba(${~~(90+165*s)},${~~(235-35*s)},${~~(180-150*s)},${(.86+.09*s).toFixed(2)})`; }
+    {              const s=(t-.65)/.35;       return `rgba(255,${~~(210-175*s)},${~~(30-25*s)},${(.95+.05*s).toFixed(2)})`; }
+  }
+
+  /* ── render one frame ──────────────────────────────────────── */
+  function render() {
+    const n  = bookBuf.length;
+    const HW = DW - PL - PR;
+    const HH = DH - PT - PB;
+    const CW = HW / N_COLS;
+    const CH = HH / N_TICKS;
+
+    /* background */
+    ctx.fillStyle = '#000008';
+    ctx.fillRect(0, 0, DW, DH);
+
+    /* subtle horizontal grid */
+    ctx.strokeStyle = 'rgba(255,255,255,0.022)'; ctx.lineWidth = 0.5;
+    for (let t = 0; t <= N_TICKS; t += 4) {
+      const y = PT + (N_TICKS - t) * CH;
+      ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL + HW, y); ctx.stroke();
+    }
+    /* subtle vertical time dividers */
+    ctx.strokeStyle = 'rgba(255,255,255,0.018)'; ctx.lineWidth = 0.5;
+    for (let c = 0; c <= N_COLS; c += 10) {
+      const x = PL + c * CW;
+      ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PT + HH); ctx.stroke();
+    }
+
+    /* ── heatmap ── */
+    for (let ci = 0; ci < n; ci++) {
+      const col = bookBuf[ci];
+      const x   = PL + ci * CW;
+      for (let t = 0; t < N_TICKS; t++) {
+        const rgba = heatRGBA(col[t]);
+        if (!rgba) continue;
+        const y = PT + (N_TICKS - 1 - t) * CH;
+        ctx.fillStyle = rgba;
+        ctx.fillRect(x, y, CW + 0.5, CH + 0.5);
+      }
+    }
+
+    /* ── large order glow ── */
+    if (absorbTick >= 0) {
+      const ay = PT + (N_TICKS - 0.5 - absorbTick) * CH;
+      const g  = ctx.createLinearGradient(PL, 0, PL + HW, 0);
+      g.addColorStop(0,    'rgba(255,165,0,0)');
+      g.addColorStop(0.30, 'rgba(255,165,0,0.10)');
+      g.addColorStop(1,    'rgba(255,165,0,0.28)');
+      ctx.fillStyle = g;
+      ctx.fillRect(PL, ay - CH * 1.8, HW, CH * 3.6);
+
+      ctx.strokeStyle = 'rgba(255,210,0,0.55)'; ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(PL, ay); ctx.lineTo(PL + HW, ay); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    /* ── price line ── */
+    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+    ctx.shadowBlur = 4;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (let ci = 0; ci < n; ci++) {
+      const x = PL + (ci + 0.5) * CW;
+      const y = PT + (N_TICKS - 0.5 - priceBuf[ci]) * CH;
+      ci === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+
+    /* ── trade dots ── */
+    const firstCI = totalCols - n;
+    for (const tr of tradeBuf) {
+      const ci = tr.ci - firstCI;
+      if (ci < 0 || ci >= n) continue;
+      const x = PL + (ci + 0.5) * CW;
+      const y = PT + (N_TICKS - 0.5 - tr.tick) * CH;
+      const r = clamp(CH * 0.38, 1.5, 3.8);
+      ctx.fillStyle = tr.side > 0 ? 'rgba(34,197,94,.88)' : 'rgba(239,68,68,.88)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    /* ── price axis labels ── */
+    ctx.textAlign = 'right'; ctx.font = '10px Inter, monospace';
+    for (let t = 0; t < N_TICKS; t += 4) {
+      const price = (BASE + (t - N_TICKS / 2) * TICK).toFixed(2);
+      const y = PT + (N_TICKS - 0.5 - t) * CH;
+      ctx.fillStyle = Math.abs(t - priceTick) < 2 ? '#d4d4e8' : '#38384e';
+      ctx.fillText(price, PL - 3, y + 3.5);
+    }
+
+    /* ── current price badge ── */
+    const cpY = PT + (N_TICKS - 0.5 - priceTick) * CH;
+    const cpV = (BASE + (priceTick - N_TICKS / 2) * TICK).toFixed(2);
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath(); ctx.roundRect(2, cpY - 10, 64, 20, 3); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10.5px Inter, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(cpV, 34, cpY + 4);
+
+    /* ── volume profile ── */
+    const vp = new Float32Array(N_TICKS);
+    for (const col of bookBuf) for (let t = 0; t < N_TICKS; t++) vp[t] += col[t];
+    const maxV = Math.max(1, ...vp);
+    const pocT = vp.reduce((a, v, i) => (v > vp[a] ? i : a), 0);
+    for (let t = 0; t < N_TICKS; t++) {
+      const bw = (vp[t] / maxV) * (PR - 10);
+      const y  = PT + (N_TICKS - 1 - t) * CH;
+      ctx.fillStyle = t === pocT ? 'rgba(249,115,22,.75)' : bw / (PR - 10) > 0.55 ? 'rgba(59,130,246,.42)' : 'rgba(59,130,246,.18)';
+      ctx.fillRect(DW - PR + 4, y + 0.5, bw, CH - 1);
+    }
+    /* POC line */
+    const pocY = PT + (N_TICKS - 0.5 - pocT) * CH;
+    ctx.strokeStyle = 'rgba(249,115,22,.38)'; ctx.lineWidth = 0.75; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(PL, pocY); ctx.lineTo(DW - PR + 4, pocY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f97316'; ctx.font = '8px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('POC', DW - PR + 5, pocY - 1.5);
+
+    /* ── CVD area ── */
+    const cvdY0 = DH - PB + 4, cvdH = PB - 32, cvdMid = cvdY0 + cvdH / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.012)'; ctx.fillRect(PL, cvdY0, HW, cvdH);
+    ctx.fillStyle = '#1e2030'; ctx.font = '9px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('CVD', PL + 4, cvdY0 + 11);
+    /* zero line */
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 0.75;
+    ctx.beginPath(); ctx.moveTo(PL, cvdMid); ctx.lineTo(PL + HW, cvdMid); ctx.stroke();
+    /* CVD curve */
+    const maxAbsCVD = Math.max(1, ...cvdBuf.map(Math.abs));
+    ctx.beginPath();
+    for (let ci = 0; ci < n; ci++) {
+      const x = PL + (ci + 0.5) * CW;
+      const y = cvdMid - (cvdBuf[ci] / maxAbsCVD) * (cvdH / 2 - 3);
+      ci === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    const lastCvd = cvdBuf[n - 1] || 0;
+    ctx.strokeStyle = lastCvd >= 0 ? '#10b981' : '#ef4444'; ctx.lineWidth = 1.5; ctx.stroke();
+    /* CVD fill */
+    ctx.lineTo(PL + (n - 0.5) * CW, cvdMid); ctx.lineTo(PL + 0.5 * CW, cvdMid); ctx.closePath();
+    ctx.fillStyle = lastCvd >= 0 ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.07)'; ctx.fill();
+
+    /* ── status overlay ── */
+    if (statusFade > 0.03 && statusMsg) {
+      ctx.globalAlpha = Math.min(1, statusFade);
+      ctx.font = 'bold 12.5px Inter, sans-serif';
+      const tw = ctx.measureText(statusMsg).width;
+      const bw = tw + 30, bh = 31;
+      const bx = PL + HW - bw - 10, by = PT + 10;
+      ctx.fillStyle = 'rgba(4,4,14,0.88)';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.fill();
+      ctx.strokeStyle = statusClr; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = statusClr; ctx.textAlign = 'left';
+      ctx.fillText(statusMsg, bx + 13, by + 21);
+      ctx.globalAlpha = 1;
+    }
+
+    /* ── footer strip ── */
+    ctx.fillStyle = '#06060e'; ctx.fillRect(0, DH - 26, DW, 26);
+    ctx.fillStyle = '#252535'; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('ESM6  ·  CME Globex  ·  Tick 0.25  ·  Simulated Order Flow', PL, DH - 9);
+    /* phase dots */
+    PHASES.forEach((p, i) => {
+      const x = DW - PHASES.length * 18 - 8 + i * 18, y = DH - 13;
+      ctx.fillStyle = i === phase ? (statusClr || '#10b981') : '#151a28';
+      ctx.beginPath(); ctx.arc(x, y, i === phase ? 5 : 3.5, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  /* ── initialise buffers ────────────────────────────────────── */
+  function init() {
+    priceTick = Math.round(N_TICKS / 2);
+    for (let i = 0; i < N_COLS; i++) {
+      bookBuf.push(makeCol('normal'));
+      priceBuf.push(priceTick);
+      cvdBuf.push(0);
+    }
+  }
+
+  /* ── resize canvas ─────────────────────────────────────────── */
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    DW = canvas.parentElement.clientWidth;
+    DH = 460;
+    canvas.width  = Math.round(DW * dpr);
+    canvas.height = Math.round(DH * dpr);
+    canvas.style.width  = DW + 'px';
+    canvas.style.height = DH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /* ── animation loop ────────────────────────────────────────── */
+  let playing = true;
+  function loop() {
+    requestAnimationFrame(loop);
+    if (playing) for (let i = 0; i < TPF; i++) advance();
+    render();
+  }
+
+  /* ── play / pause control ──────────────────────────────────── */
+  const btn = document.getElementById('bm-play');
+  if (btn) btn.addEventListener('click', () => {
+    playing = !playing;
+    btn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  init();
+  loop();
+})();
+</script>
+</body>
+</html>
